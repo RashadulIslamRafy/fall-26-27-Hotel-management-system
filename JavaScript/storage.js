@@ -151,3 +151,26 @@ DB.init(KEYS.AMENITIES, [
     simpleRow({ id: "AR002", room: "301", item: "Water Bottle", time: "2026-11-07 09:20 AM" }),
     simpleRow({ id: "AR003", room: "308", item: "Soap",         time: "2026-11-07 10:05 AM" })
 ]);
+
+
+// Order placement er 10 minute pore automatically Tray Collection e pathiye dey
+function checkAutoTrayCollection() {
+    const orders = DB.get(KEYS.FOOD);
+    const now = Date.now();
+    const TEN_MINUTES = 10 * 60 * 1000;
+    let changed = false;
+
+    orders.forEach(order => {
+        const placedAt = order.createdAt || parseTime(order.time);
+
+        if (!order.trayStatus && placedAt && (now - placedAt >= TEN_MINUTES)) {
+            order.trayStatus = "Eating Finished";
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        DB.set(KEYS.FOOD, orders);
+        window.dispatchEvent(new Event("storage")); // sob page ke janiye dibe je data change hoise
+    }
+}
