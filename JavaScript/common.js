@@ -31,6 +31,31 @@ const REQUIRE_LOGIN = false;
     document.head.appendChild(style);
 })();
 
+
+/* ---------- Auto Tray Collection (order place howar 10 min pore automatic alert) ---------- */
+
+function checkAutoTrayCollection() {
+    const orders = DB.get(KEYS.FOOD);
+    const now = Date.now();
+    const TEN_MINUTES = 10 * 60 * 1000;
+    let changed = false;
+
+    orders.forEach(order => {
+        const placedAt = order.createdAt || parseTime(order.time);
+
+        if (!order.trayStatus && placedAt && (now - placedAt >= TEN_MINUTES)) {
+            order.trayStatus = "Eating Finished";
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        DB.set(KEYS.FOOD, orders);
+        window.dispatchEvent(new Event("storage")); // sob page ke janiye dibe je data change hoise
+    }
+}
+
+
 // showToast("Order added", "success")   types: success | error | info
 function showToast(message, type = "success") {
     let toast = document.getElementById("toast");
@@ -52,6 +77,9 @@ function showToast(message, type = "success") {
 /* ---------- Login check, profile name, logout ---------- */
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    checkAutoTrayCollection();                      // page load hobar shathe shathe ekbar check
+    setInterval(checkAutoTrayCollection, 15000);     // tarpor every 15 sec check hote thakbe
 
     let user = null;
     try {
