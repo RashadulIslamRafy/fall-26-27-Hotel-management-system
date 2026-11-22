@@ -1,5 +1,5 @@
 const hotelNavigation = [
-    { label: "Dashboard", file: "Dashboard.html" },
+    { label: "Dashboard", file: "Reciptionist Dashboard.html" },
     { label: "Room Availability", file: "RoomAvailability.html" },
     { label: "Booking Management", file: "Management.html" },
     { label: "Create Booking", file: "Booking.html" },
@@ -20,7 +20,7 @@ function loadHotelNavigation() {
     const navbar = document.createElement("header");
     navbar.className = "navbar";
     navbar.innerHTML =
-        `<div class="brand"><img src="Image/hotel logo.png" alt="Hotel logo"><span>Hotel Management System</span></div>` +
+        `<div class="brand"><img src="../fall-26-27-Hotel-management-system/Images(Samia)/hotel logo.png" alt="Hotel logo"><span>Hotel Management System</span></div>` +
         `<nav aria-label="Main navigation">${links}</nav>`;
 
     const placeholder = document.getElementById("hotel-navbar");
