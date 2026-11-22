@@ -87,9 +87,9 @@ function validateLogin() {
     showError("password", "Please enter your password.");
     if (errorMsg === "") errorMsg = "Please enter your password.";
     isValid = false;
-  } else if (password.length < 6) {
-    showError("password", "Password must be at least 6 characters.");
-    if (errorMsg === "") errorMsg = "Password must be at least 6 characters.";
+  } else if (password.length < 5) {
+    showError("password", "Password must be at least 5 characters.");
+    if (errorMsg === "") errorMsg = "Password must be at least 5 characters.";
     isValid = false;
   }
 
@@ -98,15 +98,32 @@ function validateLogin() {
     return false;
   }
 
-  if (username === "Admin" && password === "Admin123" && role === "Admin") {
-    let form = document.getElementById("loginForm");
+  let form = document.getElementById("loginForm");
+
+  // 1. Admin Login -> Admin.html
+  if (username.toLowerCase() === "admin" && (password === "Admin" || password === "Admin123") && role.toLowerCase() === "admin") {
     form.action = "Admin.html";
     return true;
-  } else if (role !== "Admin") {
-    showMessage("loginMessage", "Logged in as <strong>" + role + "</strong>. (Only Admin dashboard is active in this module.)", "info");
-    return false;
-  } else {
-    showMessage("loginMessage", "Wrong username or password. Use Admin / Admin123.", "error");
+  }
+  // 2. Customer Login -> Dashboard_Customar.html
+  else if (username.toLowerCase() === "customer" && (password === "Customer" || password === "customer") && role.toLowerCase() === "customer") {
+    form.action = "Dashboard_Customar.html";
+    return true;
+  }
+  // 3. Staff / Room Service Login -> dashboard_rafi.html
+  else if (username.toLowerCase() === "staff" && (password === "Staff" || password === "staff") && role.toLowerCase() === "room service") {
+    form.action = "dashboard_rafi.html";
+    return true;
+  }
+  // 4. Receptionist Login -> Reciptionist Dashboard.html
+  else if ((username.toLowerCase() === "reciptionist" || username.toLowerCase() === "receptionist") &&
+           (password.toLowerCase() === "reciptionist" || password.toLowerCase() === "receptionist") &&
+           (role.toLowerCase() === "receptionist" || role.toLowerCase() === "reciptionist")) {
+    form.action = "Reciptionist Dashboard.html";
+    return true;
+  }
+  else {
+    showMessage("loginMessage", "Invalid username or password for the selected role.", "error");
     return false;
   }
 }
