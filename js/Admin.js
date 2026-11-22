@@ -1,3 +1,4 @@
+// 23-55670-3(Anusha)
 function generateAdminReport() {
   let availableRooms = 0;
   for (const room of rooms) {

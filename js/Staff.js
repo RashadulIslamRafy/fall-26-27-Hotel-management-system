@@ -1,3 +1,4 @@
+// 23-55670-3(Anusha)
 let editStaffIndex = -1;
 const staffFields = ["staffId", "staffName", "staffEmail", "staffPhone", "staffPosition", "staffSalary"];
 
