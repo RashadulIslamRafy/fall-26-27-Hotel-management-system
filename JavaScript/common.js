@@ -1,118 +1,141 @@
-
-var REQUIRE_LOGIN = false;
-
-
-/* ---------- Toast message (small popup, bottom-right) ---------- */
-
-(function addToastStyles() {
-    var style = document.createElement("style");
-    style.textContent =
-        "#toast {" +
-        "position: fixed;" +
-        "right: 24px;" +
-        "bottom: 24px;" +
-        "z-index: 9999;" +
-        "padding: 12px 18px;" +
-        "border-radius: 8px;" +
-        "color: #fff;" +
-        "font-size: 13px;" +
-        "font-weight: 700;" +
-        "box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);" +
-        "opacity: 0;" +
-        "transform: translateY(12px);" +
-        "transition: opacity 0.25s ease, transform 0.25s ease;" +
-        "pointer-events: none;" +
-        "}" +
-        "#toast.show { opacity: 1; transform: none; }" +
-        "#toast.success { background: #19a34a; }" +
-        "#toast.error { background: #d62835; }" +
-        "#toast.info { background: #0875dc; }";
-    document.head.appendChild(style);
-})();
+/* =====================================================================
+   common.js  -  Shob page-e use hoy emon helper function gulo
+   ---------------------------------------------------------------------
+   storage.js-er por, ar proti page-er nijer script-er age load hoy.
+   ===================================================================== */
 
 
-/* ---------- Auto Tray Collection (10 minutes after the order was placed) ---------- */
+/* ---------- 1. Message ----------
+   Proti page-e <div id="pageMessage" class="message"></div> ache.
+   type hocche "success", "error" ba "info" (egulo CSS class). */
 
-function checkAutoTrayCollection() {
-    var orders = DB.get(KEYS.FOOD);
-    var now = Date.now();
-    var TEN_MINUTES = 10 * 60 * 1000;
-    var changed = false;
-    var i;
-
-    for (i = 0; i < orders.length; i++) {
-        var order = orders[i];
-        var placedAt = order.createdAt;
-        if (!placedAt) {
-            placedAt = parseTime(order.time);
-        }
-
-        if (!order.trayStatus && placedAt && (now - placedAt >= TEN_MINUTES)) {
-            order.trayStatus = "Eating Finished";
-            changed = true;
-        }
-    }
-
-    if (changed) {
-        DB.set(KEYS.FOOD, orders);
-        window.dispatchEvent(new Event("storage")); // tells every page the data changed
-    }
+function showMessage(boxId, text, type) {
+    let box = document.getElementById(boxId);
+    box.innerHTML = text;
+    box.className = "message " + type;
+    box.style.display = "block";
 }
 
+function hideMessage(boxId) {
+    document.getElementById(boxId).style.display = "none";
+}
 
-// showToast("Order added", "success")   types: success | error | info
+// Jate onno page showToast(...) call korle-o kaj kore
 function showToast(message, type) {
     if (type === undefined) {
         type = "success";
     }
 
-    var toast = document.getElementById("toast");
-
-    if (!toast) {
-        toast = document.createElement("div");
-        toast.id = "toast";
-        document.body.appendChild(toast);
+    if (document.getElementById("pageMessage") == null) {
+        alert(message);
+    } else {
+        showMessage("pageMessage", message, type);
     }
-
-    toast.textContent = message;
-    toast.className = type + " show";
-
-    clearTimeout(toast.hideTimer);
-    toast.hideTimer = setTimeout(function () {
-        toast.className = type;
-    }, 2500);
 }
 
 
-/* ---------- Login check, profile name, logout ---------- */
+/* ---------- 2. Field-er pashe error dekhano ----------
+   Je field check kora hoy tar pashe <span class="error" id="fieldIdError"></span> ache.
+   Amra innerHTML diye error likhi ar element.style diye
+   field-er border lal kori. */
 
-document.addEventListener("DOMContentLoaded", function () {
-
-    checkAutoTrayCollection();                      // check once as soon as the page loads
-    setInterval(checkAutoTrayCollection, 15000);     // then keep checking every 15 seconds
-
-    var user = memoryStore[KEYS.USER];
-    if (user === undefined) {
-        user = null;
+function showError(fieldId, message) {
+    let errorBox = document.getElementById(fieldId + "Error");
+    if (errorBox != null) {
+        errorBox.innerHTML = message;
     }
 
-    // Not logged in -> back to the login page
-    if (REQUIRE_LOGIN && !user) {
-        window.location.href = "login.html";
-        return;
+    let field = document.getElementById(fieldId);
+    if (field != null) {
+        field.style.border = "2px solid red";
+    }
+}
+
+function clearError(fieldId) {
+    let errorBox = document.getElementById(fieldId + "Error");
+    if (errorBox != null) {
+        errorBox.innerHTML = "";
     }
 
-    // Show the logged-in name in the top-right profile box
-    var nameBox = document.querySelector(".profile span:nth-child(2)");
-    if (user && user.name && nameBox) {
-        nameBox.textContent = user.name;
+    let field = document.getElementById(fieldId);
+    if (field != null) {
+        field.style.border = "";   // "" dile border CSS file-er moto hoye jay
+    }
+}
+
+// Onek field-er error ekshathe muchhe dey; fieldIds ekta array
+function clearErrors(fieldIds) {
+    for (let i = 0; i < fieldIds.length; i++) {
+        clearError(fieldIds[i]);
+    }
+}
+
+
+/* ---------- 3. List-er jonno chhoto helper ---------- */
+
+// "text"-er bhitore "keyword" thakle true dey (boro/chhoto hater lekha dhorbe na)
+function containsText(text, keyword) {
+    return String(text).toLowerCase().indexOf(keyword.toLowerCase()) !== -1;
+}
+
+// Je object-er id mile jay tar position (index) dey, na paile -1
+function findIndexById(list, id) {
+    for (let i = 0; i < list.length; i++) {
+        if (list[i].id === id) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// "index"-er element chhara notun ekta array dey
+function removeAt(list, index) {
+    return list.slice(0, index).concat(list.slice(index + 1));
+}
+
+
+/* ---------- 4. Auto Tray Collection ----------
+   Delivered order-er 10 minute pare "Eating Finished" alert chole ashe.
+   Page load hole ekbar-i chole. */
+
+function checkAutoTrayCollection() {
+    let orders = DB.get(KEYS.FOOD);
+    let now = Number(new Date());
+    let tenMinutes = 10 * 60 * 1000;
+
+    for (let i = 0; i < orders.length; i++) {
+        let order = orders[i];
+        let placedAt = order.createdAt;
+        if (!placedAt) {
+            placedAt = parseTime(order.time);
+        }
+
+        if (order.status === "Delivered" && !order.trayStatus && placedAt && (now - placedAt >= tenMinutes)) {
+            order.trayStatus = "Eating Finished";
+        }
     }
 
-    // Logout link: clear the session, then let the link go to login.html
-    var logoutLink = document.querySelector('.sidebar-menu a[href="login.html"]');
-    if (logoutLink) {
-        logoutLink.addEventListener("click", function () {
-            delete memoryStore[KEYS.USER];
-        });
+    DB.set(KEYS.FOOD, orders);
+}
+
+
+/* ---------- 5. Profile-er nam ebong logout ---------- */
+
+function showProfileName() {
+    let user = memoryStore[KEYS.USER];
+    let nameBox = document.getElementById("profile-name");
+
+    if (user != null && user.name && nameBox != null) {
+        nameBox.innerHTML = user.name;
     }
-});
+}
+
+// Logout link eta call kore, tarpor login.html-e jay
+function logout() {
+    memoryStore[KEYS.USER] = undefined;
+}
+
+
+// Page load hole ekbar chole (script gulo <body>-r sheshe ache)
+checkAutoTrayCollection();
+showProfileName();
