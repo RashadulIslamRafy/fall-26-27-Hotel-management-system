@@ -1,51 +1,82 @@
 
-const KEYS = {
+var KEYS = {
     FOOD: "foodOrders",
     ISSUES: "roomIssues",
     AMENITIES: "amenityRequests",
     USER: "currentUser"            // { name: "...", role: "..." }
 };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+
+/* ---------- Data lives only in memory (no database, no localStorage) ---------- */
+var memoryStore = {};
 
 
 /* ---------- Tiny database helper ---------- */
-const DB = {
+var DB = {
 
     // Read a list (returns [] if nothing saved yet)
-    get(key) {
-        try {
-            return JSON.parse(localStorage.getItem(key)) || [];
-        } catch (error) {
+    get: function (key) {
+        if (memoryStore[key] === undefined) {
             return [];
         }
+        return memoryStore[key];
     },
 
     // Save a list
-    set(key, data) {
-        localStorage.setItem(key, JSON.stringify(data));
+    set: function (key, data) {
+        memoryStore[key] = data;
     },
 
     // Next ID like FO004, IR004, AR004
-    nextId(prefix, list) {
-        const highest = list.reduce((max, item) => {
-            const num = parseInt(String(item.id).replace(/\D/g, ""), 10) || 0;
-            return Math.max(max, num);
-        }, 0);
-        return prefix + String(highest + 1).padStart(3, "0");
+    nextId: function (prefix, list) {
+        var highest = 0;
+        var i;
+
+        for (i = 0; i < list.length; i++) {
+            var idText = String(list[i].id);
+            var digits = "";
+            var c;
+
+            for (c = 0; c < idText.length; c++) {
+                var ch = idText.charAt(c);
+                if (ch >= "0" && ch <= "9") {
+                    digits = digits + ch;
+                }
+            }
+
+            var num = parseInt(digits, 10);
+            if (isNaN(num)) {
+                num = 0;
+            }
+            if (num > highest) {
+                highest = num;
+            }
+        }
+
+        var nextNumber = highest + 1;
+        var nextText = String(nextNumber);
+        while (nextText.length < 3) {
+            nextText = "0" + nextText;
+        }
+
+        return prefix + nextText;
     },
 
-    // Save demo data only the very first time
-    init(key, seed) {
-        if (localStorage.getItem(key) === null) {
+    // Save demo data only the very first time (nothing in memory yet)
+    init: function (key, seed) {
+        if (memoryStore[key] === undefined) {
             DB.set(key, seed);
         }
     },
 
     // Type DB.reset() in the browser console to get the demo data back
-    reset() {
-        [KEYS.FOOD, KEYS.ISSUES, KEYS.AMENITIES].forEach(key => localStorage.removeItem(key));
+    reset: function () {
+        delete memoryStore[KEYS.FOOD];
+        delete memoryStore[KEYS.ISSUES];
+        delete memoryStore[KEYS.AMENITIES];
         location.reload();
     }
 };
@@ -54,75 +85,186 @@ const DB = {
 /* ---------- Helper functions ---------- */
 
 function pad(n) {
-    return String(n).padStart(2, "0");
+    var text = String(n);
+    if (text.length < 2) {
+        text = "0" + text;
+    }
+    return text;
 }
 
 // Current time as  "2026-11-07 10:30 AM"
 function formatNow() {
-    const d = new Date();
-    let hours = d.getHours();
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(hours)}:${pad(d.getMinutes())} ${ampm}`;
+    var d = new Date();
+    var hours = d.getHours();
+    var ampm = "AM";
+
+    if (hours >= 12) {
+        ampm = "PM";
+    }
+    hours = hours % 12;
+    if (hours === 0) {
+        hours = 12;
+    }
+
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+        " " + pad(hours) + ":" + pad(d.getMinutes()) + " " + ampm;
 }
 
 // "2026-11-07 10:30 AM"  ->  timestamp (number). Returns 0 if it can't be read.
 function parseTime(str) {
-    const m = /(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(str || "");
-    if (!m) return 0;
-    let hours = parseInt(m[4], 10) % 12;
-    if (m[6].toUpperCase() === "PM") hours += 12;
-    return new Date(+m[1], +m[2] - 1, +m[3], hours, +m[5]).getTime();
+    if (!str) {
+        return 0;
+    }
+
+    var parts = str.split(" ");
+    if (parts.length < 3) {
+        return 0;
+    }
+
+    var dateParts = parts[0].split("-");
+    var timeParts = parts[1].split(":");
+    var ampm = parts[2];
+
+    var year = parseInt(dateParts[0], 10);
+    var month = parseInt(dateParts[1], 10) - 1;
+    var day = parseInt(dateParts[2], 10);
+    var hours = parseInt(timeParts[0], 10) % 12;
+    var minutes = parseInt(timeParts[1], 10);
+
+    if (ampm.toUpperCase() === "PM") {
+        hours = hours + 12;
+    }
+
+    var d = new Date(year, month, day, hours, minutes);
+    return d.getTime();
 }
 
 // "2026-11-07 10:30 AM"  ->  "10:30 AM"
 function timeOnly(str) {
-    return String(str || "").replace(/^\d{4}-\d{2}-\d{2}\s+/, "");
+    if (!str) {
+        return "";
+    }
+    var parts = str.split(" ");
+    if (parts.length < 3) {
+        return str;
+    }
+    return parts[1] + " " + parts[2];
 }
 
 // Today -> "10:30 AM", other days -> "07 Nov, 10:30 AM"
 function friendlyTime(str) {
-    const ts = parseTime(str);
-    if (!ts) return str || "";
-    const d = new Date(ts);
-    if (d.toDateString() === new Date().toDateString()) {
+    var ts = parseTime(str);
+    if (!ts) {
+        if (str) {
+            return str;
+        }
+        return "";
+    }
+
+    var d = new Date(ts);
+    var today = new Date();
+
+    if (d.toDateString() === today.toDateString()) {
         return timeOnly(str);
     }
-    return `${pad(d.getDate())} ${MONTHS[d.getMonth()]}, ${timeOnly(str)}`;
+    return pad(d.getDate()) + " " + MONTHS[d.getMonth()] + ", " + timeOnly(str);
 }
 
 // Stops user text from being run as HTML (use it whenever you build rows with innerHTML)
 function escapeHTML(value) {
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    var text = String(value);
+    var result = "";
+    var i;
+
+    for (i = 0; i < text.length; i++) {
+        var ch = text.charAt(i);
+
+        if (ch === "&") {
+            result = result + "&amp;";
+        } else if (ch === "<") {
+            result = result + "&lt;";
+        } else if (ch === ">") {
+            result = result + "&gt;";
+        } else if (ch === "\"") {
+            result = result + "&quot;";
+        } else if (ch === "'") {
+            result = result + "&#39;";
+        } else {
+            result = result + ch;
+        }
+    }
+
+    return result;
 }
 
 // "Eating Finished" -> "eating-finished" (matches the CSS .status classes)
 function statusClass(status) {
-    return String(status).toLowerCase().replace(/\s+/g, "-");
+    var text = String(status).toLowerCase();
+    var result = "";
+    var i;
+
+    for (i = 0; i < text.length; i++) {
+        if (text.charAt(i) === " ") {
+            result = result + "-";
+        } else {
+            result = result + text.charAt(i);
+        }
+    }
+
+    return result;
 }
 
-// Room numbers like 305, 12, A101
+// Room numbers like 305, 12, A101 (letters, digits, hyphen, 1-6 characters)
 function isValidRoom(value) {
-    return /^[A-Za-z0-9-]{1,6}$/.test(value);
+    if (!value) {
+        return false;
+    }
+    if (value.length < 1 || value.length > 6) {
+        return false;
+    }
+
+    var i;
+    for (i = 0; i < value.length; i++) {
+        var ch = value.charAt(i);
+        var isLetter = (ch >= "A" && ch <= "Z") || (ch >= "a" && ch <= "z");
+        var isDigit = ch >= "0" && ch <= "9";
+        var isDash = ch === "-";
+
+        if (!isLetter && !isDigit && !isDash) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 
 /* ---------- Demo data (copied from your HTML pages) ---------- */
 
-function foodOrder(id, room, item, qty, status, time, trayStatus = "", collectedTime = "") {
+function foodOrder(id, room, item, qty, status, time, trayStatus, collectedTime) {
+    if (trayStatus === undefined) {
+        trayStatus = "";
+    }
+    if (collectedTime === undefined) {
+        collectedTime = "";
+    }
+
     return {
-        id, room, item, qty, status, time, trayStatus, collectedTime,
+        id: id,
+        room: room,
+        item: item,
+        qty: qty,
+        status: status,
+        time: time,
+        trayStatus: trayStatus,
+        collectedTime: collectedTime,
         createdAt: parseTime(time)
     };
 }
 
 function simpleRow(fields) {
-    return { ...fields, createdAt: parseTime(fields.time) };
+    fields.createdAt = parseTime(fields.time);
+    return fields;
 }
 
 DB.init(KEYS.FOOD, [
@@ -151,26 +293,3 @@ DB.init(KEYS.AMENITIES, [
     simpleRow({ id: "AR002", room: "301", item: "Water Bottle", time: "2026-11-07 09:20 AM" }),
     simpleRow({ id: "AR003", room: "308", item: "Soap",         time: "2026-11-07 10:05 AM" })
 ]);
-
-
-// Order placement er 10 minute pore automatically Tray Collection e pathiye dey
-function checkAutoTrayCollection() {
-    const orders = DB.get(KEYS.FOOD);
-    const now = Date.now();
-    const TEN_MINUTES = 10 * 60 * 1000;
-    let changed = false;
-
-    orders.forEach(order => {
-        const placedAt = order.createdAt || parseTime(order.time);
-
-        if (!order.trayStatus && placedAt && (now - placedAt >= TEN_MINUTES)) {
-            order.trayStatus = "Eating Finished";
-            changed = true;
-        }
-    });
-
-    if (changed) {
-        DB.set(KEYS.FOOD, orders);
-        window.dispatchEvent(new Event("storage")); // sob page ke janiye dibe je data change hoise
-    }
-}

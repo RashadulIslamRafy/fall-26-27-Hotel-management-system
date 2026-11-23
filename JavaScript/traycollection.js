@@ -1,67 +1,107 @@
 
+document.addEventListener("DOMContentLoaded", function () {
 
-document.addEventListener("DOMContentLoaded", () => {
-
-    const alertBody = document.querySelector(".tray-alert-section tbody");
-    const historyBody = document.querySelector(".tray-history-section tbody");
+    var alertBody = document.querySelector(".tray-alert-section tbody");
+    var historyBody = document.querySelector(".tray-history-section tbody");
 
 
     /* ---------- Show both tables ---------- */
 
     function render() {
 
-        const orders = DB.get(KEYS.FOOD);
+        var allOrders = DB.get(KEYS.FOOD);
+        var alertsHTML = "";
+        var alertCount = 0;
+        var historyList = [];
+        var i;
 
-        const alerts = orders.filter(order => order.trayStatus === "Eating Finished");
+        for (i = 0; i < allOrders.length; i++) {
+            var order = allOrders[i];
 
-        const history = orders
-            .filter(order => order.trayStatus === "Tray Collected")
-            .sort((a, b) => parseTime(b.collectedTime) - parseTime(a.collectedTime));   // latest first
+            if (order.trayStatus === "Eating Finished") {
+                alertsHTML = alertsHTML +
+                    "<tr data-id=\"" + escapeHTML(order.id) + "\">" +
+                    "<td>" + escapeHTML(order.id) + "</td>" +
+                    "<td>" + escapeHTML(order.room) + "</td>" +
+                    "<td>" + escapeHTML(order.item) + "</td>" +
+                    "<td>" + escapeHTML(timeOnly(order.time)) + "</td>" +
+                    "<td><span class=\"status eating-finished\">Eating Finished</span></td>" +
+                    "<td><button type=\"button\" class=\"collect-btn\">Collect Tray</button></td>" +
+                    "</tr>";
+                alertCount = alertCount + 1;
+            }
+
+            if (order.trayStatus === "Tray Collected") {
+                historyList.push(order);
+            }
+        }
+
+        // Sort history by collected time, latest first (simple bubble sort, no .sort())
+        var a;
+        var b;
+        for (a = 0; a < historyList.length; a++) {
+            for (b = 0; b < historyList.length - 1 - a; b++) {
+                var timeA = parseTime(historyList[b].collectedTime);
+                var timeB = parseTime(historyList[b + 1].collectedTime);
+                if (timeA < timeB) {
+                    var temp = historyList[b];
+                    historyList[b] = historyList[b + 1];
+                    historyList[b + 1] = temp;
+                }
+            }
+        }
 
         /* Alerts */
-        if (alerts.length === 0) {
-            alertBody.innerHTML = `<tr><td colspan="6">No trays waiting for collection.</td></tr>`;
+        if (alertCount === 0) {
+            alertBody.innerHTML = "<tr><td colspan=\"6\">No trays waiting for collection.</td></tr>";
         } else {
-            alertBody.innerHTML = alerts.map(order => `
-                <tr data-id="${escapeHTML(order.id)}">
-                    <td>${escapeHTML(order.id)}</td>
-                    <td>${escapeHTML(order.room)}</td>
-                    <td>${escapeHTML(order.item)}</td>
-                    <td>${escapeHTML(timeOnly(order.time))}</td>
-                    <td><span class="status eating-finished">Eating Finished</span></td>
-                    <td><button type="button" class="collect-btn">Collect Tray</button></td>
-                </tr>
-            `).join("");
+            alertBody.innerHTML = alertsHTML;
         }
 
         /* History */
-        if (history.length === 0) {
-            historyBody.innerHTML = `<tr><td colspan="5">No trays collected yet.</td></tr>`;
+        var historyHTML = "";
+        var h;
+        for (h = 0; h < historyList.length; h++) {
+            var historyOrder = historyList[h];
+            historyHTML = historyHTML +
+                "<tr>" +
+                "<td>" + escapeHTML(historyOrder.id) + "</td>" +
+                "<td>" + escapeHTML(historyOrder.room) + "</td>" +
+                "<td>" + escapeHTML(historyOrder.item) + "</td>" +
+                "<td>" + escapeHTML(timeOnly(historyOrder.collectedTime)) + "</td>" +
+                "<td><span class=\"status tray-collected\">Tray Collected</span></td>" +
+                "</tr>";
+        }
+
+        if (historyList.length === 0) {
+            historyBody.innerHTML = "<tr><td colspan=\"5\">No trays collected yet.</td></tr>";
         } else {
-            historyBody.innerHTML = history.map(order => `
-                <tr>
-                    <td>${escapeHTML(order.id)}</td>
-                    <td>${escapeHTML(order.room)}</td>
-                    <td>${escapeHTML(order.item)}</td>
-                    <td>${escapeHTML(timeOnly(order.collectedTime))}</td>
-                    <td><span class="status tray-collected">Tray Collected</span></td>
-                </tr>
-            `).join("");
+            historyBody.innerHTML = historyHTML;
         }
     }
 
 
     /* ---------- Collect Tray button ---------- */
 
-    alertBody.addEventListener("click", (event) => {
+    alertBody.addEventListener("click", function (event) {
 
-        const button = event.target.closest(".collect-btn");
-        if (!button) return;
+        var target = event.target;
+        if (target.className.indexOf("collect-btn") === -1) {
+            return;
+        }
 
-        const id = button.closest("tr").dataset.id;
+        var row = target.parentNode.parentNode;
+        var id = row.getAttribute("data-id");
 
-        const orders = DB.get(KEYS.FOOD);
-        const order = orders.find(o => o.id === id);
+        var orders = DB.get(KEYS.FOOD);
+        var order = null;
+        var i;
+
+        for (i = 0; i < orders.length; i++) {
+            if (orders[i].id === id) {
+                order = orders[i];
+            }
+        }
 
         if (!order) {
             showToast("This order no longer exists", "error");
@@ -73,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
         order.collectedTime = formatNow();
         DB.set(KEYS.FOOD, orders);
 
-        showToast(`Tray collected from room ${order.room}`);
+        showToast("Tray collected from room " + order.room);
         render();
     });
 

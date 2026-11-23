@@ -1,59 +1,79 @@
 
+document.addEventListener("DOMContentLoaded", function () {
 
-document.addEventListener("DOMContentLoaded", () => {
+    var STATUSES = ["Pending", "Processing", "Solved"];
 
-    const STATUSES = ["Pending", "Processing", "Solved"];
+    var form = document.querySelector(".report-form-card form");
+    var roomInput = document.getElementById("room-number");
+    var descInput = document.getElementById("problem-description");
 
-    const form = document.querySelector(".report-form-card form");
-    const roomInput = document.getElementById("room-number");
-    const descInput = document.getElementById("problem-description");
+    var searchForm = document.querySelector(".issue-report-list .search-section form");
+    var searchInput = searchForm.querySelector('input[name="search"]');
+    var tbody = document.querySelector(".issue-report-list tbody");
 
-    const searchForm = document.querySelector(".issue-report-list .search-section form");
-    const searchInput = searchForm.querySelector('input[name="search"]');
-    const tbody = document.querySelector(".issue-report-list tbody");
+
+    function containsText(bigText, query) {
+        return String(bigText).toLowerCase().indexOf(query) !== -1;
+    }
+
+    function removeAt(list, index) {
+        return list.slice(0, index).concat(list.slice(index + 1));
+    }
 
 
     /* ---------- Show the table ---------- */
 
     function render() {
 
-        const query = searchInput.value.trim().toLowerCase();
+        var query = searchInput.value.trim().toLowerCase();
+        var allIssues = DB.get(KEYS.ISSUES);
+        var rowsHTML = "";
+        var shown = 0;
+        var i;
 
-        const issues = DB.get(KEYS.ISSUES).filter(issue =>
-            String(issue.room).toLowerCase().includes(query)
-        );
+        for (i = 0; i < allIssues.length; i++) {
+            var issue = allIssues[i];
 
-        if (issues.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6">No issues found.</td></tr>`;
-            return;
+            if (containsText(issue.room, query)) {
+
+                var optionsHTML = "";
+                var s;
+                for (s = 0; s < STATUSES.length; s++) {
+                    var selectedText = "";
+                    if (STATUSES[s] === issue.status) {
+                        selectedText = " selected";
+                    }
+                    optionsHTML = optionsHTML + "<option value=\"" + STATUSES[s] + "\"" + selectedText + ">" + STATUSES[s] + "</option>";
+                }
+
+                rowsHTML = rowsHTML +
+                    "<tr data-id=\"" + escapeHTML(issue.id) + "\">" +
+                    "<td>" + escapeHTML(issue.id) + "</td>" +
+                    "<td>" + escapeHTML(issue.room) + "</td>" +
+                    "<td>" + escapeHTML(issue.description) + "</td>" +
+                    "<td><select>" + optionsHTML + "</select></td>" +
+                    "<td><button type=\"button\" class=\"update-btn\">Update</button></td>" +
+                    "<td><button type=\"button\" class=\"delete-btn\">Delete</button></td>" +
+                    "</tr>";
+                shown = shown + 1;
+            }
         }
 
-        tbody.innerHTML = issues.map(issue => `
-            <tr data-id="${escapeHTML(issue.id)}">
-                <td>${escapeHTML(issue.id)}</td>
-                <td>${escapeHTML(issue.room)}</td>
-                <td>${escapeHTML(issue.description)}</td>
-                <td>
-                    <select>
-                        ${STATUSES.map(status => `
-                            <option value="${status}" ${status === issue.status ? "selected" : ""}>${status}</option>
-                        `).join("")}
-                    </select>
-                </td>
-                <td><button type="button" class="update-btn">Update</button></td>
-                <td><button type="button" class="delete-btn">Delete</button></td>
-            </tr>
-        `).join("");
+        if (shown === 0) {
+            tbody.innerHTML = "<tr><td colspan=\"6\">No issues found.</td></tr>";
+        } else {
+            tbody.innerHTML = rowsHTML;
+        }
     }
 
 
     /* ---------- Report a new issue ---------- */
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", function (event) {
         event.preventDefault();
 
-        const room = roomInput.value.trim();
-        const description = descInput.value.trim();
+        var room = roomInput.value.trim();
+        var description = descInput.value.trim();
 
         if (!isValidRoom(room)) {
             showToast("Enter a valid room number, for example 305", "error");
@@ -66,12 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const issues = DB.get(KEYS.ISSUES);
+        var issues = DB.get(KEYS.ISSUES);
 
-        const newIssue = {
+        var newIssue = {
             id: DB.nextId("IR", issues),
-            room,
-            description,
+            room: room,
+            description: description,
             status: "Pending",
             time: formatNow(),
             createdAt: Date.now()
@@ -81,24 +101,34 @@ document.addEventListener("DOMContentLoaded", () => {
         DB.set(KEYS.ISSUES, issues);
 
         form.reset();
-        showToast(`Issue ${newIssue.id} reported`);
+        showToast("Issue " + newIssue.id + " reported");
         render();
     });
 
 
     /* ---------- Update / Delete buttons inside the table ---------- */
 
-    tbody.addEventListener("click", (event) => {
+    tbody.addEventListener("click", function (event) {
 
-        const row = event.target.closest("tr[data-id]");
-        if (!row) return;
+        var target = event.target;
+        if (target.tagName !== "BUTTON") {
+            return;
+        }
 
-        const id = row.dataset.id;
+        var row = target.parentNode.parentNode;
+        var id = row.getAttribute("data-id");
 
-        if (event.target.closest(".update-btn")) {
+        if (target.className.indexOf("update-btn") !== -1) {
 
-            const issues = DB.get(KEYS.ISSUES);
-            const issue = issues.find(i => i.id === id);
+            var issues = DB.get(KEYS.ISSUES);
+            var issue = null;
+            var i;
+
+            for (i = 0; i < issues.length; i++) {
+                if (issues[i].id === id) {
+                    issue = issues[i];
+                }
+            }
 
             if (!issue) {
                 showToast("This issue no longer exists", "error");
@@ -109,15 +139,28 @@ document.addEventListener("DOMContentLoaded", () => {
             issue.status = row.querySelector("select").value;
             DB.set(KEYS.ISSUES, issues);
 
-            showToast(`Issue ${id} set to ${issue.status}`);
+            showToast("Issue " + id + " set to " + issue.status);
         }
 
-        if (event.target.closest(".delete-btn")) {
-            if (!confirm(`Delete issue ${id}?`)) return;
+        if (target.className.indexOf("delete-btn") !== -1) {
+            if (!confirm("Delete issue " + id + "?")) {
+                return;
+            }
 
-            DB.set(KEYS.ISSUES, DB.get(KEYS.ISSUES).filter(i => i.id !== id));
+            var issuesAll = DB.get(KEYS.ISSUES);
+            var indexToDelete = -1;
+            var j;
 
-            showToast(`Issue ${id} deleted`);
+            for (j = 0; j < issuesAll.length; j++) {
+                if (issuesAll[j].id === id) {
+                    indexToDelete = j;
+                }
+            }
+            if (indexToDelete !== -1) {
+                DB.set(KEYS.ISSUES, removeAt(issuesAll, indexToDelete));
+            }
+
+            showToast("Issue " + id + " deleted");
             render();
         }
     });
@@ -125,13 +168,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ---------- Search ---------- */
 
-    searchForm.addEventListener("submit", (event) => {
+    searchForm.addEventListener("submit", function (event) {
         event.preventDefault();
         render();
     });
-    searchInput.addEventListener("input", render);
+    searchInput.addEventListener("keyup", render);
 
-    // If another tab changes the data, refresh the table
+    // If another page changes the data, refresh the table
     window.addEventListener("storage", render);
 
     render();
